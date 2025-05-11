@@ -1,6 +1,6 @@
 name: Deploy to Yandex Serverless
 
-# 🚀 Триггер либо пуш в production, либо кнопка Run workflow
+# 🚀 Запускается при push в production или вручную из UI
 on:
   push:
     branches: [ production ]
@@ -11,35 +11,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Код
-      - uses: actions/checkout@v4
+      # 1. Клонируем код
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # 2) Авторизация в YC CLI (Новый namespace)
-      - name: YC Auth
-        uses: yandex-cloud/actions/auth@v0.1
+      # 2. Авторизуемся в YC CLI
+      - name: Authenticate to Yandex Cloud
+        uses: yc-actions/cli-authenticate@v1
         with:
-          service-account-json: ${{ secrets.YC_SA_KEY }}
+          service-account-key: ${{ secrets.YC_SA_KEY }}   # полный JSON-ключ
 
-      # 3) Логин в Container Registry
+      # 3. Логинимся в Container Registry
       - name: Docker login to YCR
-        run: echo "${{ secrets.YC_SA_KEY }}" \
-             | docker login --username json_key \
-               --password-stdin cr.yandex
+        run: |
+          echo '${{ secrets.YC_SA_KEY }}' \
+            | docker login --username oauth --password-stdin '${{ secrets.YC_REGISTRY }}'
 
-      # 4) Сборка и пуш
-      - name: Build & Push image
+      # 4. Сборка и push образа
+      - name: Build & push image
         env:
-          IMAGE: cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
+          IMAGE: '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
         run: |
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
-      # 5) Деплой
-      - name: Deploy to Serverless Container
-        uses: yandex-cloud/actions/sls-container/deploy@v0.1
+      # 5. Деплой в Serverless Containers
+      - name: Deploy to Serverless Containers
+        uses: yc-actions/yc-sls-container-deploy@v2
         with:
-          folder-id: ${{ secrets.YC_FOLDER_ID }}
+          folder-id:      ${{ secrets.YC_FOLDER_ID }}
           container-name: vkPalmAi
-          image-url: cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
-          memory: 512
-          timeout: 30
+          image-url:      '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
+          memory:         512   # МБ
+          timeout:        30    # сек
