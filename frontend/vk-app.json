@@ -1,0 +1,14 @@
+{
+  "app_id": 53540276,
+  "title": "Хиромант-GPT",
+  "name": "PalmAI",
+  "version": "0.1.0",
+  "description": "Онлайн-хиромант: загрузи фото ладони и получи расклад от ИИ",
+  "start_url": "index.html",
+  "required_features": [
+    "VKWebAppGetUserInfo",
+    "VKWebAppShowOrderBox",
+    "VKWebAppOpenPayForm"
+  ],
+  "offline_mode": false
+}

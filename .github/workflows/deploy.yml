@@ -1,0 +1,32 @@
+name: Deploy to Yandex Serverless
+
+on:
+  push:
+    branches: [ production ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Yandex Cloud
+        uses: yc-actions/cli-authenticate@v1
+        with:
+          service-account-key: ${{ secrets.YC_SA_KEY }}
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}" .
+          echo "${{ secrets.YC_SA_KEY }}" \
+            | docker login --username oauth --password-stdin "${{ secrets.YC_REGISTRY }}"
+          docker push "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}"
+
+      - name: Deploy to Serverless Containers
+        uses: yc-actions/yc-sls-container-deploy@v2
+        with:
+          folder-id: ${{ secrets.YC_FOLDER_ID }}
+          container-name: vkPalmAi
+          image-url: "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}"
