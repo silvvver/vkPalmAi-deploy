@@ -1,4 +1,3 @@
-# .github/workflows/deploy.yml
 name: Deploy to Yandex Serverless Container
 
 on:
@@ -9,15 +8,19 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
+      # 1. Забираем код
       - uses: actions/checkout@v4
 
+      # 2. Получаем IAM-токен из JSON-ключа
       - name: YC – get IAM token
         id: yc-auth
         uses: yc-actions/yc-iam-token@v1
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
 
+      # 3. Логинимся в Container Registry
       - name: Docker login to YCR
         uses: docker/login-action@v3
         with:
@@ -25,6 +28,7 @@ jobs:
           username: iam
           password: ${{ steps.yc-auth.outputs.token }}
 
+      # 4. Сборка и пуш образа
       - name: Build & push image
         env:
           IMAGE: cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
@@ -32,13 +36,17 @@ jobs:
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
+      # 5. Деплой Serverless-контейнера
       - name: Deploy to SLS Container
-        uses: yc-actions/yc-sls-container-deploy@v3      # ← главное исправление
+        uses: yc-actions/yc-sls-container-deploy@v3
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
           folder-id: ${{ secrets.YC_FOLDER_ID }}
-          container-name: vkPalmAi
+          container-name: vkpalm-ai                     # ← только lowercase!
           revision-image-url: cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
           revision-service-account-id: ${{ secrets.YC_SA_ID }}
           revision-memory: 512Mb
-          revision-timeout: 30
+          revision-cores: 1
+          revision-core-fraction: 100
+          revision-concurrency: 8
+          revision-execution-timeout: 30               # сек, поменяй если надо
