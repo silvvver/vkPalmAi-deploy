@@ -2,45 +2,45 @@ name: Deploy to Yandex Serverless
 
 on:
   push:
-    branches: [ production ]   # только production
-  workflow_dispatch:           # или кнопкой Run workflow
+    branches: [ production ]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) код
-      - uses: actions/checkout@v4
+    # 1. Код
+    - uses: actions/checkout@v4
 
-      # 2) получаем IAM-токен
-      - name: YC - get token
-        id: yc-auth
-        uses: yc-actions/yc-iam-token@v1
-        with:
-          service_account_key: ${{ secrets.YC_SA_KEY }}
+    # 2. Получаем IAM-токен
+    - name: YC - get token
+      id: yc-auth
+      uses: yc-actions/yc-iam-token@v1
+      with:
+        yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}   # 👈 ключевое исправление
 
-      # 3) логинимся в YCR тем же токеном
-      - name: Docker login to YCR
-        run: |
-          echo '${{ steps.yc-auth.outputs.access_token }}' \
-            | docker login --username oauth --password-stdin '${{ secrets.YC_REGISTRY }}'
+    # 3. Логин в YCR
+    - name: Docker login to YCR
+      run: |
+        echo '${{ steps.yc-auth.outputs.iam_token }}' \
+          | docker login --username oauth --password-stdin '${{ secrets.YC_REGISTRY }}'
 
-      # 4) build + push
-      - name: Build & push image
-        env:
-          IMAGE: '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
-        run: |
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
+    # 4. Build & push
+    - name: Build & push image
+      env:
+        IMAGE: '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
+      run: |
+        docker build -t "$IMAGE" .
+        docker push "$IMAGE"
 
-      # 5) deploy
-      - name: Deploy to Serverless Containers
-        uses: yc-actions/yc-sls-container-deploy@v2
-        with:
-          token:          ${{ steps.yc-auth.outputs.access_token }}
-          folder-id:      ${{ secrets.YC_FOLDER_ID }}
-          container-name: vkPalmAi
-          image-url:      '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
-          memory:         512   # МБ
-          timeout:        30    # сек
+    # 5. Deploy
+    - name: Deploy to Serverless Container
+      uses: yc-actions/yc-sls-container-deploy@v2
+      with:
+        token:          ${{ steps.yc-auth.outputs.iam_token }}
+        folder-id:      ${{ secrets.YC_FOLDER_ID }}
+        container-name: vkPalmAi
+        image-url:      '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
+        memory:         512
+        timeout:        30
