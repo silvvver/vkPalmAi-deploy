@@ -1,33 +1,32 @@
 name: Deploy to Yandex Serverless
 
-# 🚀 Запускается при push в production или вручную из UI
 on:
   push:
-    branches: [ production ]
-  workflow_dispatch:
+    branches: [ production ]   # только production
+  workflow_dispatch:           # или кнопкой Run workflow
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Клонируем код
-      - name: Checkout code
-        uses: actions/checkout@v4
+      # 1) код
+      - uses: actions/checkout@v4
 
-      # 2. Авторизуемся в YC CLI
-      - name: Authenticate to Yandex Cloud
-        uses: yc-actions/cli-authenticate@v1
+      # 2) получаем IAM-токен
+      - name: YC - get token
+        id: yc-auth
+        uses: yc-actions/yc-iam-token@v1
         with:
-          service-account-key: ${{ secrets.YC_SA_KEY }}   # полный JSON-ключ
+          service_account_key: ${{ secrets.YC_SA_KEY }}
 
-      # 3. Логинимся в Container Registry
+      # 3) логинимся в YCR тем же токеном
       - name: Docker login to YCR
         run: |
-          echo '${{ secrets.YC_SA_KEY }}' \
+          echo '${{ steps.yc-auth.outputs.access_token }}' \
             | docker login --username oauth --password-stdin '${{ secrets.YC_REGISTRY }}'
 
-      # 4. Сборка и push образа
+      # 4) build + push
       - name: Build & push image
         env:
           IMAGE: '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
@@ -35,10 +34,11 @@ jobs:
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
-      # 5. Деплой в Serverless Containers
+      # 5) deploy
       - name: Deploy to Serverless Containers
         uses: yc-actions/yc-sls-container-deploy@v2
         with:
+          token:          ${{ steps.yc-auth.outputs.access_token }}
           folder-id:      ${{ secrets.YC_FOLDER_ID }}
           container-name: vkPalmAi
           image-url:      '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
