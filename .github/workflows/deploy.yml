@@ -1,53 +1,46 @@
 name: Deploy to Yandex Serverless
 
-# ─── Триггеры ──────────────────────────────────────────────────────────
 on:
   push:
-    branches: [ production ]   # автодеплой при пуше в production
-  workflow_dispatch:           # кнопка “Run workflow” в UI
+    branches: [ production ]       # деплой при пуше в production
+  workflow_dispatch:               # + кнопка “Run workflow”
 
-# ─── Джоб ──────────────────────────────────────────────────────────────
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Берём код репозитория
-    - name: Checkout repo
-      uses: actions/checkout@v4
+    # 1. Код репозитория
+    - uses: actions/checkout@v4
 
-    # 2. Получаем IAM-токен по JSON-ключу сервис-аккаунта
+    # 2. Получаем IAM-токен
     - name: YC – get IAM token
       id: yc-auth
-      uses: yandex-cloud/actions/yc-iam-token@v1
+      uses: yc-actions/yc-iam-token@v1        # ← верный namespace
       with:
-        yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
+        service-account-json: ${{ secrets.YC_SA_KEY }}
 
-    # 3. Логинимся в Container Registry
+    # 3. Логин в Container Registry
     - name: Docker login to YCR
-      run: |
-        echo "${{ steps.yc-auth.outputs.iam_token }}" \
-          | docker login --username oauth --password-stdin cr.yandex
+      env:
+        IAM_TOKEN: ${{ steps.yc-auth.outputs.iam_token }}
+      run: echo "$IAM_TOKEN" \
+           | docker login --username oauth --password-stdin cr.yandex
 
-    # 4. Сборка и пуш образа
+    # 4. Сборка и пуш
     - name: Build & push image
       env:
-        REGISTRY:     ${{ secrets.YC_REGISTRY }}      # crprsd… без cr.yandex/
-        REPO:         ${{ secrets.YC_REPOSITORY }}    # vkpalmai
-        IMAGE_TAG:    ${{ github.sha }}               # короткий sha коммита
+        IMAGE: cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
       run: |
-        IMAGE="cr.yandex/${REGISTRY}/${REPO}:${IMAGE_TAG}"
-        echo "⏳ Build $IMAGE"
         docker build -t "$IMAGE" .
-        echo "⏳ Push $IMAGE"
         docker push "$IMAGE"
 
-    # 5. Деплой в Serverless Containers
+    # 5. Деплой в SLS Containers
     - name: Deploy to Serverless Container
-      uses: yandex-cloud/actions/sls-container/deploy@v1
+      uses: yc-actions/yc-sls-container-deploy@v2   # ← верный namespace
       with:
         folder-id:      ${{ secrets.YC_FOLDER_ID }}
-        container-name: vkPalmAi                     # любое удобное имя
+        container-name: vkPalmAi
         image-url:      cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
-        memory:         512                         # МБ
-        timeout:        30                          # сек
+        memory:         512       # МБ
+        timeout:        30        # сек
