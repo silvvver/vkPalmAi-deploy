@@ -1,46 +1,53 @@
 name: Deploy to Yandex Serverless
 
+# ─── Триггеры ──────────────────────────────────────────────────────────
 on:
   push:
-    branches: [ production ]
-  workflow_dispatch:
+    branches: [ production ]   # автодеплой при пуше в production
+  workflow_dispatch:           # кнопка “Run workflow” в UI
 
+# ─── Джоб ──────────────────────────────────────────────────────────────
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Код
-    - uses: actions/checkout@v4
+    # 1. Берём код репозитория
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-    # 2. Получаем IAM-токен
-    - name: YC - get token
+    # 2. Получаем IAM-токен по JSON-ключу сервис-аккаунта
+    - name: YC – get IAM token
       id: yc-auth
-      uses: yc-actions/yc-iam-token@v1
+      uses: yandex-cloud/actions/yc-iam-token@v1
       with:
-        yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}   # 👈 ключевое исправление
+        yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
 
-    # 3. Логин в YCR
+    # 3. Логинимся в Container Registry
     - name: Docker login to YCR
       run: |
-        echo '${{ steps.yc-auth.outputs.iam_token }}' \
-          | docker login --username oauth --password-stdin '${{ secrets.YC_REGISTRY }}'
+        echo "${{ steps.yc-auth.outputs.iam_token }}" \
+          | docker login --username oauth --password-stdin cr.yandex
 
-    # 4. Build & push
+    # 4. Сборка и пуш образа
     - name: Build & push image
       env:
-        IMAGE: '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
+        REGISTRY:     ${{ secrets.YC_REGISTRY }}      # crprsd… без cr.yandex/
+        REPO:         ${{ secrets.YC_REPOSITORY }}    # vkpalmai
+        IMAGE_TAG:    ${{ github.sha }}               # короткий sha коммита
       run: |
+        IMAGE="cr.yandex/${REGISTRY}/${REPO}:${IMAGE_TAG}"
+        echo "⏳ Build $IMAGE"
         docker build -t "$IMAGE" .
+        echo "⏳ Push $IMAGE"
         docker push "$IMAGE"
 
-    # 5. Deploy
+    # 5. Деплой в Serverless Containers
     - name: Deploy to Serverless Container
-      uses: yc-actions/yc-sls-container-deploy@v2
+      uses: yandex-cloud/actions/sls-container/deploy@v1
       with:
-        token:          ${{ steps.yc-auth.outputs.iam_token }}
         folder-id:      ${{ secrets.YC_FOLDER_ID }}
-        container-name: vkPalmAi
-        image-url:      '${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}'
-        memory:         512
-        timeout:        30
+        container-name: vkPalmAi                     # любое удобное имя
+        image-url:      cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
+        memory:         512                         # МБ
+        timeout:        30                          # сек
