@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Забираем код
+      # 1. Клонируем репозиторий
       - uses: actions/checkout@v4
 
-      # 2. Получаем IAM-токен из JSON-ключа
+      # 2. Генерируем IAM-токен Yandex Cloud
       - name: YC – get IAM token
         id: yc-auth
         uses: yc-actions/yc-iam-token@v1
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
 
-      # 3. Логинимся в Container Registry
+      # 3. Логинимся в Yandex Container Registry
       - name: Docker login to YCR
         uses: docker/login-action@v3
         with:
@@ -28,7 +28,7 @@ jobs:
           username: iam
           password: ${{ steps.yc-auth.outputs.token }}
 
-      # 4. Сборка и пуш образа
+      # 4. Сборка и публикация Docker-образа
       - name: Build & push image
         env:
           IMAGE: cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
@@ -42,11 +42,13 @@ jobs:
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
           folder-id: ${{ secrets.YC_FOLDER_ID }}
-          container-name: vkpalm-ai                     # ← только lowercase!
+          container-name: vkpalm-ai
           revision-image-url: cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
           revision-service-account-id: ${{ secrets.YC_SA_ID }}
           revision-memory: 512Mb
           revision-cores: 1
           revision-core-fraction: 100
           revision-concurrency: 8
-          revision-execution-timeout: 30               # сек, поменяй если надо
+          revision-execution-timeout: 30
+          revision-env: |
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
