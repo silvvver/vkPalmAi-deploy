@@ -9,24 +9,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1) Забираем код
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2) Авторизуемся в Yandex Cloud через готовый экшен
       - name: Authenticate to Yandex Cloud
         uses: yc-actions/cli-authenticate@v1
         with:
           service-account-key: ${{ secrets.YC_SA_KEY }}
 
+      # 3) Собираем и пушим Docker-образ
       - name: Build and push Docker image
         run: |
+          # Собираем образ с тегом вида cr.yandex/registry/repo:SHA
           docker build -t "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}" .
+
+          # Логинимся в registry с помощью токена из service-account
           echo "${{ secrets.YC_SA_KEY }}" \
             | docker login --username oauth --password-stdin "${{ secrets.YC_REGISTRY }}"
+
+          # Пушим
           docker push "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}"
 
+      # 4) Деплой в Serverless Containers
       - name: Deploy to Serverless Containers
         uses: yc-actions/yc-sls-container-deploy@v2
         with:
-          folder-id: ${{ secrets.YC_FOLDER_ID }}
-          container-name: vkPalmAi
+          folder-id: ${{ secrets.YC_FOLDER_ID }}             # ID папки в Yandex Cloud
+          container-name: vkPalmAi                          # имя сервиса в Serverless Containers
           image-url: "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}"
