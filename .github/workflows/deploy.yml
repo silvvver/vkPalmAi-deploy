@@ -1,43 +1,52 @@
 name: Deploy to Yandex Serverless
 
+# Запускаем на пуши именно в production
 on:
   push:
     branches:
       - production
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1) Клонируем репозиторий
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2) Авторизуемся в YC через официальный action
       - name: Authenticate to Yandex Cloud
-        uses: yc-actions/cli-authenticate@v1
+        uses: yandex-cloud/yc-actions@v1
         with:
           service-account-key: ${{ secrets.YC_SA_KEY }}
 
+      # 3) Строим образ
       - name: Build Docker image
         run: |
           docker build \
             -t "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}" \
             .
 
-      - name: Login to Yandex Container Registry
+      # 4) Логинимся в Container Registry
+      - name: Log in to Yandex Container Registry
         run: |
           echo "${{ secrets.YC_SA_KEY }}" \
             | docker login --username oauth --password-stdin "${{ secrets.YC_REGISTRY }}"
 
+      # 5) Пушим образ
       - name: Push Docker image
         run: |
           docker push "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}"
 
+      # 6) Деплоим в Serverless Containers
       - name: Deploy to Serverless Containers
-        uses: yc-actions/yc-sls-container-deploy@v2
+        uses: yandex-cloud/yc-sls-container-deploy@v2
         with:
           folder-id: ${{ secrets.YC_FOLDER_ID }}
           container-name: vkPalmAi
           image-url: "${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${GITHUB_SHA}"
-          memory: 512     # MB
-          timeout: 30     # sec
+          # опции
+          memory: 512       # МБ
+          timeout: 30       # сек
+
