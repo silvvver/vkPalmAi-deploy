@@ -52,3 +52,5 @@ jobs:
           revision-execution-timeout: 30
           revision-env: |
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            VK_SECURE_KEY=${{ secrets.VK_SECURE_KEY }}
+            VK_SERVICE_TOKEN=${{ secrets.VK_SERVICE_TOKEN }}
