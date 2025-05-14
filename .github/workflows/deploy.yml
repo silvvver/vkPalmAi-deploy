@@ -13,7 +13,7 @@ jobs:
       # 1. Клонируем репозиторий
       - uses: actions/checkout@v4
 
-      # 2. Генерируем IAM-токен Yandex Cloud
+      # 2. Получаем IAM-токен Yandex Cloud
       - name: YC – get IAM token
         id: yc-auth
         uses: yc-actions/yc-iam-token@v1
@@ -28,7 +28,7 @@ jobs:
           username: iam
           password: ${{ steps.yc-auth.outputs.token }}
 
-      # 4. Сборка и публикация Docker-образа
+      # 4. Сборка и пуш Docker-образа
       - name: Build & push image
         env:
           IMAGE: cr.yandex/${{ secrets.YC_REGISTRY }}/${{ secrets.YC_REPOSITORY }}:${{ github.sha }}
