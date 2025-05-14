@@ -54,3 +54,4 @@ jobs:
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             VK_SECURE_KEY=${{ secrets.VK_SECURE_KEY }}
             VK_SERVICE_TOKEN=${{ secrets.VK_SERVICE_TOKEN }}
+            OPENAI_API_BASE_URL=https://openai-proxy.podry-openai-proxy-2025.workers.dev
